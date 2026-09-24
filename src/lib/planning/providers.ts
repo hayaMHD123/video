@@ -18,7 +18,9 @@ export class PlanningProviderError extends Error {
       | "free-tier-unavailable"
       | "invalid-request"
       | "model-unavailable"
-      | "timeout",
+      | "timeout"
+      | "billing-required",
+    public readonly httpStatus?: number,
   ) {
     super(`${provider}: ${reason}`);
     this.name = "PlanningProviderError";
@@ -83,9 +85,11 @@ async function geminiHttpError(response: Response): Promise<PlanningProviderErro
         ? "invalid-request"
         : status === 403
           ? "access"
-          : status === 404
-            ? "model-unavailable"
-            : status === 429
+        : status === 404
+          ? "model-unavailable"
+          : status === 402
+            ? "billing-required"
+          : status === 429
               ? "quota"
               : status === 408 || status === 504
                 ? "timeout"
@@ -93,7 +97,7 @@ async function geminiHttpError(response: Response): Promise<PlanningProviderErro
 
   // Never log the response body, request headers, or API key.
   console.warn("[api/plan] Gemini request failed", { httpStatus: status, providerStatus, reason });
-  return new PlanningProviderError("Gemini", reason);
+  return new PlanningProviderError("Gemini", reason, status);
 }
 
 export async function planWithGemini(request: PlanRequest, apiKey: string): Promise<EpisodePlan> {
