@@ -4,7 +4,7 @@ import { generatedPlanSchema, parseGeneratedPlan } from "./schema";
 
 // This model currently has a free text tier. Never silently switch to a paid
 // model. A key must belong to a Free-tier project for the user's zero-cost goal.
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+const GEMINI_MODEL = "gemini-3.1-flash-lite";
 
 export class PlanningProviderError extends Error {
   constructor(
