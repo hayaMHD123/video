@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
@@ -163,6 +164,7 @@ export default function StudioApp() {
 
   useEffect(() => {
     let active = true;
+    const openMediaTab = new URLSearchParams(window.location.search).get("tab") === "media";
     const restore = async () => {
       try {
         const storedBrief = localStorage.getItem("hikaya:brief");
@@ -173,7 +175,7 @@ export default function StudioApp() {
           const parsed = JSON.parse(storedPlan) as EpisodePlan;
           if (Array.isArray(parsed.scenes)) {
             setPlan(parsed);
-            setStage(1);
+            setStage(openMediaTab ? 2 : 1);
           }
         }
         if (storedMeta) {
@@ -500,6 +502,13 @@ export default function StudioApp() {
           </div>
         </div>
       </header>
+
+      <nav className="workspace-tabs" aria-label="أقسام الموقع">
+        <div className="workspace-tabs-inner">
+          <span className="workspace-tab active" aria-current="page"><Clapperboard size={16} /> استوديو الحلقات</span>
+          <Link className="workspace-tab" href="/character"><Images size={16} /> الشخصية الثابتة</Link>
+        </div>
+      </nav>
 
       <main className="studio-layout">
         <aside className="steps-panel">
