@@ -110,9 +110,9 @@ export async function planWithGemini(request: PlanRequest, apiKey: string): Prom
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: buildPlanningPrompt(request) }] }],
           generationConfig: {
-            responseFormat: {
-              text: { mimeType: "application/json", schema: generatedPlanSchema },
-            },
+            // The prompt carries the schema. JSON-only mode avoids a 400 from
+            // projects that reject this model's nested responseFormat schema.
+            responseMimeType: "application/json",
             temperature: 0.7,
           },
         }),
