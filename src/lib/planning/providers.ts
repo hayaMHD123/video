@@ -9,7 +9,16 @@ const GEMINI_MODEL = "gemini-3.5-flash-lite";
 export class PlanningProviderError extends Error {
   constructor(
     public readonly provider: "Gemini" | "Ollama",
-    public readonly reason: "quota" | "access" | "unavailable" | "invalid-output",
+    public readonly reason:
+      | "quota"
+      | "access"
+      | "unavailable"
+      | "invalid-output"
+      | "invalid-key"
+      | "free-tier-unavailable"
+      | "invalid-request"
+      | "model-unavailable"
+      | "timeout",
   ) {
     super(`${provider}: ${reason}`);
     this.name = "PlanningProviderError";
@@ -31,6 +40,60 @@ function httpReason(status: number): PlanningProviderError["reason"] {
   if (status === 429) return "quota";
   if (status === 401 || status === 403) return "access";
   return "unavailable";
+}
+
+async function geminiHttpError(response: Response): Promise<PlanningProviderError> {
+  let providerStatus = "unknown";
+  let invalidKey = false;
+  try {
+    const body: unknown = await response.json();
+    if (body && typeof body === "object" && "error" in body) {
+      const detail = body.error;
+      if (detail && typeof detail === "object") {
+        if ("status" in detail && typeof detail.status === "string") {
+          const allowedStatuses = [
+            "INVALID_ARGUMENT",
+            "FAILED_PRECONDITION",
+            "PERMISSION_DENIED",
+            "NOT_FOUND",
+            "RESOURCE_EXHAUSTED",
+            "INTERNAL",
+            "UNAVAILABLE",
+            "DEADLINE_EXCEEDED",
+          ];
+          if (allowedStatuses.includes(detail.status)) providerStatus = detail.status;
+        }
+        if ("details" in detail && Array.isArray(detail.details)) {
+          invalidKey = detail.details.some(
+            (item) => item && typeof item === "object" && "reason" in item && item.reason === "API_KEY_INVALID",
+          );
+        }
+      }
+    }
+  } catch {
+    // Some proxy errors have no JSON body. The HTTP status is still useful.
+  }
+
+  const status = response.status;
+  const reason: PlanningProviderError["reason"] = invalidKey || status === 401
+    ? "invalid-key"
+    : providerStatus === "FAILED_PRECONDITION"
+      ? "free-tier-unavailable"
+      : status === 400
+        ? "invalid-request"
+        : status === 403
+          ? "access"
+          : status === 404
+            ? "model-unavailable"
+            : status === 429
+              ? "quota"
+              : status === 408 || status === 504
+                ? "timeout"
+                : "unavailable";
+
+  // Never log the response body, request headers, or API key.
+  console.warn("[api/plan] Gemini request failed", { httpStatus: status, providerStatus, reason });
+  return new PlanningProviderError("Gemini", reason);
 }
 
 export async function planWithGemini(request: PlanRequest, apiKey: string): Promise<EpisodePlan> {
@@ -57,10 +120,12 @@ export async function planWithGemini(request: PlanRequest, apiKey: string): Prom
         cache: "no-store",
       },
     );
-  } catch {
-    throw new PlanningProviderError("Gemini", "unavailable");
+  } catch (error) {
+    const reason = error instanceof Error && error.name === "TimeoutError" ? "timeout" : "unavailable";
+    console.warn("[api/plan] Gemini fetch failed", { reason });
+    throw new PlanningProviderError("Gemini", reason);
   }
-  if (!response.ok) throw new PlanningProviderError("Gemini", httpReason(response.status));
+  if (!response.ok) throw await geminiHttpError(response);
   let result: unknown;
   try {
     result = await response.json();

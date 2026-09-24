@@ -8,6 +8,11 @@ function providerNotice(error: unknown): string {
     return "تعذّر إنشاء الخطة بالذكاء الاصطناعي.";
   }
   if (error.reason === "quota") return `انتهت الحصة المجانية لدى ${error.provider}.`;
+  if (error.reason === "invalid-key") return "رفض Gemini مفتاح API؛ تأكد من نسخ المفتاح كاملًا ومن مشروعه في Google AI Studio.";
+  if (error.reason === "free-tier-unavailable") return "رفض Google طلب Gemini لأن الفئة المجانية غير متاحة لجهة الاتصال أو مشروع المفتاح. لم يُفعّل الموقع أي خدمة مدفوعة.";
+  if (error.reason === "invalid-request") return "رفض Gemini صيغة الطلب (400). هذه مشكلة في إعداد الاتصال داخل الموقع.";
+  if (error.reason === "model-unavailable") return "نموذج Gemini المحدد غير متاح لهذا المشروع (404).";
+  if (error.reason === "timeout") return "انتهت مهلة انتظار Gemini؛ حاول مرة أخرى لاحقًا.";
   if (error.reason === "access") return `تعذّر الوصول إلى ${error.provider} بهذا الإعداد أو من هذه المنطقة.`;
   if (error.reason === "invalid-output") return `أعاد ${error.provider} خطة غير مكتملة.`;
   return `تعذّر الاتصال بـ${error.provider}.`;
